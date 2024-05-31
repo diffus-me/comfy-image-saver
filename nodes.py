@@ -7,6 +7,8 @@ import piexif.helper
 from PIL import Image, ExifTags
 from PIL.PngImagePlugin import PngInfo
 import numpy as np
+
+import execution_context
 import folder_paths
 import comfy.sd
 from nodes import MAX_RESOLUTION
@@ -127,13 +129,16 @@ class CfgLiteral:
 
 class CheckpointSelector:
     CATEGORY = 'ImageSaverTools/utils'
-    RETURN_TYPES = (folder_paths.get_filename_list("checkpoints"),)
     RETURN_NAMES = ("ckpt_name",)
     FUNCTION = "get_names"
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {"required": {"ckpt_name": (folder_paths.get_filename_list("checkpoints"), ),}}
+    def RETURN_TYPES(cls, context: execution_context.ExecutionContext):
+        return (folder_paths.get_filename_list(context, "checkpoints"),)
+
+    @classmethod
+    def INPUT_TYPES(cls, context: execution_context.ExecutionContext):
+        return {"required": {"ckpt_name": (folder_paths.get_filename_list(context, "checkpoints"), ),}}
 
     def get_names(self, ckpt_name):
         return (ckpt_name,)
@@ -172,7 +177,7 @@ class ImageSaveWithMetadata:
         pass
 
     @classmethod
-    def INPUT_TYPES(cls):
+    def INPUT_TYPES(cls, context: execution_context.ExecutionContext):
         return {
             "required": {
                 "images": ("IMAGE", ),
@@ -181,7 +186,7 @@ class ImageSaveWithMetadata:
                 "extension": (['png', 'jpeg', 'webp'],),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0}),
-                "modelname": (folder_paths.get_filename_list("checkpoints"),),
+                "modelname": (folder_paths.get_filename_list(context, "checkpoints"),),
                 "sampler_name": (comfy.samplers.KSampler.SAMPLERS,),
                 "scheduler": (comfy.samplers.KSampler.SCHEDULERS,),
             },
@@ -199,7 +204,7 @@ class ImageSaveWithMetadata:
             "hidden": {
                 "prompt": "PROMPT",
                 "extra_pnginfo": "EXTRA_PNGINFO",
-                "user_hash": "USER_HASH"
+                "context": "EXECUTION_CONTEXT"
             },
         }
 
@@ -211,21 +216,22 @@ class ImageSaveWithMetadata:
     CATEGORY = "ImageSaverTools"
 
     def save_files(self, images, seed_value, steps, cfg, sampler_name, scheduler, positive, negative, modelname, quality_jpeg_or_webp,
-                   lossless_webp, width, height, counter, filename, path, extension, time_format, prompt=None, extra_pnginfo=None, user_hash=''):
+                   lossless_webp, width, height, counter, filename, path, extension, time_format, prompt=None, extra_pnginfo=None,
+                   context: execution_context.ExecutionContext = None):
         filename = make_filename(filename, seed_value, modelname, counter, time_format)
         path = make_pathname(path, seed_value, modelname, counter, time_format)
-        ckpt_path = folder_paths.get_full_path("checkpoints", modelname)
+        ckpt_path = folder_paths.get_full_path(context, "checkpoints", modelname)
         basemodelname = parse_name(modelname)
         modelhash = calculate_sha256(ckpt_path)[:10]
         comment = f"{handle_whitespace(positive)}\nNegative prompt: {handle_whitespace(negative)}\nSteps: {steps}, Sampler: {sampler_name}{f'_{scheduler}' if scheduler != 'normal' else ''}, CFG Scale: {cfg}, Seed: {seed_value}, Size: {width}x{height}, Model hash: {modelhash}, Model: {basemodelname}, Version: ComfyUI"
-        output_path = os.path.join(folder_paths.get_output_directory(user_hash), path)
+        output_path = os.path.join(folder_paths.get_output_directory(context.user_hash), path)
 
         if output_path.strip() != '':
             if not os.path.exists(output_path.strip()):
                 print(f'The path `{output_path.strip()}` specified doesn\'t exist! Creating directory.')
                 os.makedirs(output_path, exist_ok=True)    
 
-        filenames = self.save_images(images, output_path, filename, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt, extra_pnginfo, user_hash)
+        filenames = self.save_images(images, output_path, filename, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt, extra_pnginfo, context.user_hash)
 
         subfolder = os.path.normpath(path)
         return {"ui": {"images": map(lambda filename: {"filename": filename, "subfolder": subfolder if subfolder != '.' else '', "type": 'output'}, filenames)}}
