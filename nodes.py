@@ -169,7 +169,7 @@ class SchedulerSelector:
 
 class ImageSaveWithMetadata:
     def __init__(self):
-        self.output_dir = folder_paths.output_directory
+        pass
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -198,7 +198,8 @@ class ImageSaveWithMetadata:
             },
             "hidden": {
                 "prompt": "PROMPT",
-                "extra_pnginfo": "EXTRA_PNGINFO"
+                "extra_pnginfo": "EXTRA_PNGINFO",
+                "user_hash": "USER_HASH"
             },
         }
 
@@ -210,26 +211,26 @@ class ImageSaveWithMetadata:
     CATEGORY = "ImageSaverTools"
 
     def save_files(self, images, seed_value, steps, cfg, sampler_name, scheduler, positive, negative, modelname, quality_jpeg_or_webp,
-                   lossless_webp, width, height, counter, filename, path, extension, time_format, prompt=None, extra_pnginfo=None):
+                   lossless_webp, width, height, counter, filename, path, extension, time_format, prompt=None, extra_pnginfo=None, user_hash=''):
         filename = make_filename(filename, seed_value, modelname, counter, time_format)
         path = make_pathname(path, seed_value, modelname, counter, time_format)
         ckpt_path = folder_paths.get_full_path("checkpoints", modelname)
         basemodelname = parse_name(modelname)
         modelhash = calculate_sha256(ckpt_path)[:10]
         comment = f"{handle_whitespace(positive)}\nNegative prompt: {handle_whitespace(negative)}\nSteps: {steps}, Sampler: {sampler_name}{f'_{scheduler}' if scheduler != 'normal' else ''}, CFG Scale: {cfg}, Seed: {seed_value}, Size: {width}x{height}, Model hash: {modelhash}, Model: {basemodelname}, Version: ComfyUI"
-        output_path = os.path.join(self.output_dir, path)
+        output_path = os.path.join(folder_paths.get_output_directory(user_hash), path)
 
         if output_path.strip() != '':
             if not os.path.exists(output_path.strip()):
                 print(f'The path `{output_path.strip()}` specified doesn\'t exist! Creating directory.')
                 os.makedirs(output_path, exist_ok=True)    
 
-        filenames = self.save_images(images, output_path, filename, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt, extra_pnginfo)
+        filenames = self.save_images(images, output_path, filename, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt, extra_pnginfo, user_hash)
 
         subfolder = os.path.normpath(path)
         return {"ui": {"images": map(lambda filename: {"filename": filename, "subfolder": subfolder if subfolder != '.' else '', "type": 'output'}, filenames)}}
 
-    def save_images(self, images, output_path, filename_prefix, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt=None, extra_pnginfo=None) -> list[str]:
+    def save_images(self, images, output_path, filename_prefix, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt=None, extra_pnginfo=None, user_hash='') -> list[str]:
         img_count = 1
         paths = list()
         for image in images:
