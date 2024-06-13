@@ -23,14 +23,17 @@ def parse_name(ckpt_name):
 
 
 def calculate_sha256(file_path):
-    sha256_hash = hashlib.sha256()
+    if hasattr(file_path, 'sha256'):
+        return file_path.sha256
+    else:
+        sha256_hash = hashlib.sha256()
 
-    with open(file_path, "rb") as f:
-        # Read the file in chunks to avoid loading the entire file into memory
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
+        with open(file_path, "rb") as f:
+            # Read the file in chunks to avoid loading the entire file into memory
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
 
-    return sha256_hash.hexdigest()
+        return sha256_hash.hexdigest()
 
 
 def handle_whitespace(string: str):
@@ -231,10 +234,10 @@ class ImageSaveWithMetadata:
                 print(f'The path `{output_path.strip()}` specified doesn\'t exist! Creating directory.')
                 os.makedirs(output_path, exist_ok=True)    
 
-        filenames = self.save_images(images, output_path, filename, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt, extra_pnginfo, context.user_hash)
+        filenames = self.save_images(images, output_path, filename, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt, extra_pnginfo, user_hash=context.user_hash)
 
         subfolder = os.path.normpath(path)
-        return {"ui": {"images": map(lambda filename: {"filename": filename, "subfolder": subfolder if subfolder != '.' else '', "type": 'output'}, filenames)}}
+        return {"ui": {"images": map(lambda filename: {"filename": filename, "subfolder": subfolder if subfolder != '.' else '', "type": 'output',"user_hash": context.user_hash,}, filenames)}}
 
     def save_images(self, images, output_path, filename_prefix, comment, extension, quality_jpeg_or_webp, lossless_webp, prompt=None, extra_pnginfo=None, user_hash='') -> list[str]:
         img_count = 1
