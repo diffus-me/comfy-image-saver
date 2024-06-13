@@ -23,14 +23,17 @@ def parse_name(ckpt_name):
 
 
 def calculate_sha256(file_path):
-    sha256_hash = hashlib.sha256()
+    if hasattr(file_path, 'sha256'):
+        return file_path.sha256
+    else:
+        sha256_hash = hashlib.sha256()
 
-    with open(file_path, "rb") as f:
-        # Read the file in chunks to avoid loading the entire file into memory
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
+        with open(file_path, "rb") as f:
+            # Read the file in chunks to avoid loading the entire file into memory
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
 
-    return sha256_hash.hexdigest()
+        return sha256_hash.hexdigest()
 
 
 def handle_whitespace(string: str):
